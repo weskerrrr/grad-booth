@@ -26292,9 +26292,39 @@ void main() {
           });
         });
       }
+      var SAVE_KEY = "grad-booth-state";
       function refreshCount() {
         const n = stalls.filter((s) => s.userData.locked).length;
         document.getElementById("status").textContent = `\u5DF2\u9501\u5B9A ${n} / 24`;
+      }
+      function saveState() {
+        const data = stalls.map((stall) => ({
+          id: stall.userData.id,
+          name: stall.userData.name || "",
+          locked: !!stall.userData.locked
+        }));
+        localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      }
+      function restoreState() {
+        let data = [];
+        try {
+          data = JSON.parse(localStorage.getItem(SAVE_KEY) || "[]");
+        } catch (e) {
+          data = [];
+        }
+        const byId = {};
+        data.forEach((item) => {
+          byId[item.id] = item;
+        });
+        stalls.forEach((stall) => {
+          const item = byId[stall.userData.id];
+          if (!item) return;
+          stall.userData.name = item.name || "";
+          stall.userData.locked = !!item.locked;
+          drawLabel(stall.userData.label, stall.userData.id, stall.userData.name);
+          if (stall.userData.locked) paint(stall, true);
+        });
+        refreshCount();
       }
       function hideMenu() {
         menu.style.display = "none";
@@ -26331,6 +26361,7 @@ void main() {
         const name = document.getElementById("booth-name").value.trim().slice(0, 12);
         selected.userData.name = name;
         drawLabel(selected.userData.label, selected.userData.id, name);
+        saveState();
         showLockStep();
       };
       document.getElementById("yes").onclick = () => {
@@ -26338,9 +26369,13 @@ void main() {
         selected.userData.locked = !selected.userData.locked;
         paint(selected, selected.userData.locked);
         refreshCount();
+        saveState();
         hideMenu();
       };
-      document.getElementById("no").onclick = hideMenu;
+      document.getElementById("no").onclick = () => {
+        saveState();
+        hideMenu();
+      };
       function fillArrow(g, x1, y1, x2, y2, thickness) {
         const ang = Math.atan2(y2 - y1, x2 - x1);
         const len = Math.hypot(x2 - x1, y2 - y1);
@@ -26457,7 +26492,8 @@ void main() {
           scene.add(stall);
           stalls.push(stall);
         }
-        document.getElementById("hint").textContent = "\u70B9\u9009\u644A\u4F4D\u540E\u5148\u586B\u5199\u540D\u5B57\uFF0C\u518D\u51B3\u5B9A\u662F\u5426\u9501\u5B9A\u3002";
+        restoreState();
+        document.getElementById("hint").textContent = "\u70B9\u9009\u644A\u4F4D\u540E\u5148\u586B\u5199\u540D\u5B57\uFF0C\u518D\u51B3\u5B9A\u662F\u5426\u9501\u5B9A\u3002\u786E\u5B9A\u9501\u5B9A\u540E\u4F1A\u8BB0\u4F4F\u672C\u6B21\u586B\u5199\u3002";
       }
       try {
         const binary = Uint8Array.from(atob(FBX_B64), (c) => c.charCodeAt(0));
