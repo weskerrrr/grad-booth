@@ -23,7 +23,12 @@ canvas { display: block; }
   box-shadow: 6px 6px 0 rgba(28,36,48,0.18);
 }
 #menu .hd { padding: 12px 14px 4px; font-size: 15px; font-weight: 700; }
-#menu .q { padding: 0 14px 12px; font-size: 14px; }
+#menu .q { padding: 0 14px 10px; font-size: 14px; }
+#menu input {
+  display: block; width: calc(100% - 28px); margin: 0 14px 12px;
+  box-sizing: border-box; border: 1px solid #1c2430; background: #fff;
+  font: 15px "Microsoft YaHei", sans-serif; padding: 8px;
+}
 #menu .acts { display: flex; border-top: 1px solid #1c2430; }
 #menu button {
   flex: 1; border: 0; background: transparent; padding: 10px 0;
@@ -43,10 +48,17 @@ canvas { display: block; }
 <div id="bar"><h1>毕业展摊位</h1><p id="hint">正在载入摊位模型…</p></div>
 <div id="menu">
   <div class="hd" id="menu-title">摊位 1</div>
-  <div class="q" id="menu-q">是否锁定摊位？</div>
-  <div class="acts">
-    <button type="button" id="yes">是</button>
-    <button type="button" id="no">否</button>
+  <div id="step-name">
+    <div class="q">输入摊位名字</div>
+    <input id="booth-name" maxlength="12" placeholder="例如：八桂茶语">
+    <div class="acts"><button type="button" id="name-ok">确定</button></div>
+  </div>
+  <div id="step-lock" style="display:none">
+    <div class="q" id="menu-q">是否锁定摊位？</div>
+    <div class="acts">
+      <button type="button" id="yes">是</button>
+      <button type="button" id="no">否</button>
+    </div>
   </div>
 </div>
 <div id="status">已锁定 0 / 24</div>
@@ -26184,21 +26196,37 @@ void main() {
           odd: n % 2 === 1
         };
       }
-      function makeLabel(text) {
+      function drawLabel(sprite, id, name) {
         const c = document.createElement("canvas");
-        c.width = 128;
-        c.height = 128;
+        c.width = 640;
+        c.height = 180;
         const g = c.getContext("2d");
+        g.clearRect(0, 0, 640, 180);
         g.fillStyle = "#1c2430";
-        g.fillRect(24, 24, 80, 80);
+        g.fillRect(40, 18, 560, name ? 150 : 90);
         g.fillStyle = "#fffdf8";
-        g.font = "700 54px Microsoft YaHei, sans-serif";
         g.textAlign = "center";
         g.textBaseline = "middle";
-        g.fillText(text, 64, 68);
-        const sprite = new Sprite(new SpriteMaterial({ map: new CanvasTexture(c), transparent: true }));
-        sprite.scale.set(0.7, 0.7, 0.7);
-        sprite.position.y = 2.35;
+        if (name) {
+          g.font = "700 54px Microsoft YaHei, sans-serif";
+          g.fillText(name, 320, 72);
+          g.font = "500 28px Microsoft YaHei, sans-serif";
+          g.fillText(String(id), 320, 128);
+        } else {
+          g.font = "700 64px Microsoft YaHei, sans-serif";
+          g.fillText(String(id), 320, 62);
+        }
+        const tex = new CanvasTexture(c);
+        tex.colorSpace = SRGBColorSpace;
+        if (sprite.material.map) sprite.material.map.dispose();
+        sprite.material.map = tex;
+        sprite.material.needsUpdate = true;
+        sprite.scale.set(name ? 1.9 : 0.72, name ? 0.54 : 0.42, 1);
+      }
+      function makeLabel(id) {
+        const sprite = new Sprite(new SpriteMaterial({ transparent: true }));
+        sprite.position.y = 2.45;
+        drawLabel(sprite, id, "");
         return sprite;
       }
       function footprint() {
@@ -26258,16 +26286,39 @@ void main() {
         menu.style.display = "none";
         selected = null;
       }
-      function showMenu(stall, x2, y) {
-        selected = stall;
-        const locked = stall.userData.locked;
-        document.getElementById("menu-title").textContent = `\u644A\u4F4D ${stall.userData.id}`;
-        document.getElementById("menu-q").textContent = locked ? "\u8BE5\u644A\u4F4D\u5DF2\u9501\u5B9A\uFF0C\u662F\u5426\u53D6\u6D88\u9501\u5B9A\uFF1F" : "\u662F\u5426\u9501\u5B9A\u644A\u4F4D\uFF1F";
+      function placeMenu(x2, y) {
         menu.style.display = "block";
-        const w = 220, h = 110;
+        const w = 260, h = 170;
         menu.style.left = Math.min(x2 + 12, innerWidth - w - 8) + "px";
         menu.style.top = Math.min(y + 12, innerHeight - h - 8) + "px";
       }
+      function showNameStep(stall, x2, y) {
+        selected = stall;
+        document.getElementById("menu-title").textContent = `\u644A\u4F4D ${stall.userData.id}`;
+        document.getElementById("step-name").style.display = "block";
+        document.getElementById("step-lock").style.display = "none";
+        const input = document.getElementById("booth-name");
+        input.value = stall.userData.name || "";
+        placeMenu(x2, y);
+        input.focus();
+      }
+      function showLockStep() {
+        if (!selected) return;
+        const locked = selected.userData.locked;
+        document.getElementById("step-name").style.display = "none";
+        document.getElementById("step-lock").style.display = "block";
+        document.getElementById("menu-q").textContent = locked ? "\u8BE5\u644A\u4F4D\u5DF2\u9501\u5B9A\uFF0C\u662F\u5426\u53D6\u6D88\u9501\u5B9A\uFF1F" : "\u662F\u5426\u9501\u5B9A\u644A\u4F4D\uFF1F";
+      }
+      document.getElementById("booth-name").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") document.getElementById("name-ok").click();
+      });
+      document.getElementById("name-ok").onclick = () => {
+        if (!selected) return;
+        const name = document.getElementById("booth-name").value.trim().slice(0, 12);
+        selected.userData.name = name;
+        drawLabel(selected.userData.label, selected.userData.id, name);
+        showLockStep();
+      };
       document.getElementById("yes").onclick = () => {
         if (!selected) return;
         selected.userData.locked = !selected.userData.locked;
@@ -26384,16 +26435,15 @@ void main() {
           });
           stall.add(model);
           stall.add(footprint());
-          const label = makeLabel(String(n));
-          label.position.y = 2.15;
+          const label = makeLabel(n);
           stall.add(label);
           stall.position.set(spot.x, 0, spot.z);
           stall.rotation.y = spot.odd ? Math.PI / 2 : -Math.PI / 2;
-          stall.userData = { id: n, locked: false };
+          stall.userData = { id: n, locked: false, name: "", label };
           scene.add(stall);
           stalls.push(stall);
         }
-        document.getElementById("hint").textContent = "\u5DE6\u952E\u65CB\u8F6C\uFF0C\u53F3\u952E\u5E73\u79FB\uFF0C\u6EDA\u8F6E\u7F29\u653E\u3002\u70B9\u9009\u644A\u4F4D\u540E\u53EF\u9501\u5B9A\u3002";
+        document.getElementById("hint").textContent = "\u70B9\u9009\u644A\u4F4D\u540E\u5148\u586B\u5199\u540D\u5B57\uFF0C\u518D\u51B3\u5B9A\u662F\u5426\u9501\u5B9A\u3002";
       }
       try {
         const binary = Uint8Array.from(atob(FBX_B64), (c) => c.charCodeAt(0));
@@ -26428,7 +26478,7 @@ void main() {
           hideMenu();
           return;
         }
-        showMenu(stall, event.clientX, event.clientY);
+        showNameStep(stall, event.clientX, event.clientY);
       });
       addEventListener("resize", () => {
         camera.aspect = innerWidth / innerHeight;
